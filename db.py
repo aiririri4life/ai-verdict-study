@@ -100,12 +100,34 @@ CREATE TABLE IF NOT EXISTS participants (
 """
 
 
+# Set once per worker process, the first time get_db() actually opens a
+# connection — NOT at import time. app.py used to call init_db() at
+# module load, which meant every gunicorn worker's boot blocked on a
+# network round-trip to Turso before the worker was considered "ready".
+# On Render's free tier (throttled CPU, cold-starts from scratch after
+# every spin-down), that round-trip could run long enough to hit
+# gunicorn's worker timeout mid-connection, get SIGKILLed, and crash-loop
+# on every subsequent boot. Deferring it to first use means a slow first
+# request just pays the connection cost once (now with more timeout
+# headroom — see gunicorn.conf.py) instead of taking the whole worker
+# down before it can serve anything.
+_schema_ready = False
+
+
 @contextmanager
 def get_db():
+    global _schema_ready
+
     if TURSO_DATABASE_URL:
         conn = libsql.connect(TURSO_DATABASE_URL, auth_token=TURSO_AUTH_TOKEN)
     else:
         conn = libsql.connect(DB_PATH)
+
+    if not _schema_ready:
+        conn.execute(SCHEMA)
+        conn.commit()
+        _schema_ready = True
+
     try:
         yield conn
         conn.commit()
@@ -121,8 +143,11 @@ def _row_to_dict(cursor, row):
 
 
 def init_db():
+    """Kept as a standalone callable for scripts/tests that want to force
+    schema creation explicitly; app.py no longer calls this at import
+    time (see the comment above get_db())."""
     with get_db() as conn:
-        conn.execute(SCHEMA)
+        pass  # get_db() itself already ensures the schema exists
 
 
 def column_names():

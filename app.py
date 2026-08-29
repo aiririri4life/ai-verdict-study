@@ -23,7 +23,9 @@ import config
 from randomization import assign_condition
 
 app = Flask(__name__)
-db.init_db()
+
+# No db.init_db() call here at import time — see the comment above
+# get_db() in db.py for why. Schema creation happens lazily on first use.
 
 ADMIN_EXPORT_PASSWORD = os.environ.get("ADMIN_EXPORT_PASSWORD")
 
