@@ -8,10 +8,18 @@ without adding correctness. One row per participant also makes the CSV
 export in export.py trivial — it's the table, unmodified.
 """
 
+import os
 import sqlite3
 from contextlib import contextmanager
 
 DB_PATH = "data/study.db"
+
+# The data/ directory is empty in the repo (its only contents are the
+# git-ignored .db file), and git doesn't track empty directories — so a
+# fresh checkout (e.g. Render's) has no data/ folder at all until this
+# runs. Without it, sqlite3.connect() fails with "unable to open database
+# file" rather than creating it.
+os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS participants (
