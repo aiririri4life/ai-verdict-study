@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Investment Reasoning Study</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+
+{% macro likert_row(name, text, scale_max=7) %}
+<fieldset class="likert-row">
+  <legend>{{ text }}</legend>
+  <div class="likert-scale">
+    {% for i in range(1, scale_max + 1) %}
+    <label class="likert-option">
+      <input type="radio" name="{{ name }}" value="{{ i }}" required>
+      <span>{{ i }}</span>
+    </label>
+    {% endfor %}
+  </div>
+</fieldset>
+{% endmacro %}
+
+<div id="app">
+
+  <!-- Blocked screen: shown by JS if this browser already completed the study -->
+  <section id="already-participated" class="step">
+    <h1>You've already participated</h1>
+    <p>Our records show this browser has already completed this study. Thank you again for your time — no further action is needed.</p>
+  </section>
+
+  <!-- Step 0: Consent -->
+  <section id="step-0" class="step active">
+    <h1>Research Study: Investment Decision Making</h1>
+    <div class="content-block">{{ consent_text }}</div>
+    <label class="checkbox-line">
+      <input type="checkbox" id="consent-checkbox">
+      {{ consent_checkbox_label }}
+    </label>
+    <button id="consent-continue" disabled>Continue</button>
+  </section>
+
+  <!-- Step 1: Covariates -->
+  <section id="step-1" class="step">
+    <h1>A few questions before we begin</h1>
+
+    <fieldset>
+      <legend>{{ ai_use_question }}</legend>
+      <div class="likert-scale labeled-scale">
+        {% for label in ai_use_labels %}
+        <label class="likert-option">
+          <input type="radio" name="ai_use_frequency" value="{{ loop.index }}" required>
+          <span>{{ loop.index }}<br>{{ label }}</span>
+        </label>
+        {% endfor %}
+      </div>
+    </fieldset>
+
+    {% for item in tech_affinity_items %}
+      {{ likert_row('tech_affinity_' ~ loop.index, item, 7) }}
+    {% endfor %}
+
+    <h2>A few quick questions</h2>
+    {% for q in fin_lit_questions %}
+    {% set q_idx = loop.index0 %}
+    <fieldset>
+      <legend>{{ q.question }}</legend>
+      {% for opt in q.options %}
+      <label class="radio-line">
+        <input type="radio" name="fin_lit_{{ q_idx }}" value="{{ loop.index0 }}" required>
+        {{ opt }}
+      </label>
+      {% endfor %}
+    </fieldset>
+    {% endfor %}
+
+    <fieldset>
+      <legend>How would you rate your own knowledge of investing?</legend>
+      <div class="likert-scale labeled-scale">
+        <label class="likert-option"><input type="radio" name="fin_lit_self_rating" value="1" required><span>1<br>Very low</span></label>
+        <label class="likert-option"><input type="radio" name="fin_lit_self_rating" value="2"><span>2</span></label>
+        <label class="likert-option"><input type="radio" name="fin_lit_self_rating" value="3"><span>3</span></label>
+        <label class="likert-option"><input type="radio" name="fin_lit_self_rating" value="4"><span>4</span></label>
+        <label class="likert-option"><input type="radio" name="fin_lit_self_rating" value="5"><span>5</span></label>
+        <label class="likert-option"><input type="radio" name="fin_lit_self_rating" value="6"><span>6</span></label>
+        <label class="likert-option"><input type="radio" name="fin_lit_self_rating" value="7"><span>7<br>Very high</span></label>
+      </div>
+    </fieldset>
+
+    <label class="field-line">
+      Age
+      <input type="number" id="age" min="1" max="120" required>
+    </label>
+    <label class="field-line">
+      Current grade / year in school
+      <input type="text" id="grade_year" required>
+    </label>
+
+    <p class="error-message" id="step1-error"></p>
+    <button id="step1-continue">Continue</button>
+  </section>
+
+  <!-- Step 2: Scenario + initial stance -->
+  <section id="step-2" class="step">
+    <h1>Investment Scenario</h1>
+    <div class="content-block scenario-box">{{ scenario_text }}</div>
+
+    <fieldset>
+      <legend>{{ stance_question_pre }}</legend>
+      <label class="radio-line"><input type="radio" name="pre_stance" value="yes" required> Yes</label>
+      <label class="radio-line"><input type="radio" name="pre_stance" value="no"> No</label>
+    </fieldset>
+
+    <fieldset>
+      <legend>How confident are you in this decision?</legend>
+      <div class="likert-scale labeled-scale">
+        {% for i in range(1, 8) %}
+        <label class="likert-option"><input type="radio" name="pre_confidence" value="{{ i }}" required><span>{{ i }}</span></label>
+        {% endfor %}
+      </div>
+    </fieldset>
+
+    <label class="field-line">
+      In 2-4 sentences, explain your reasoning.
+      <textarea id="pre_rationale" rows="5" required></textarea>
+    </label>
+    <p id="pre_rationale_warning" class="warning-message" hidden>
+      That's a bit short — try to give a few more sentences of reasoning (aim for ~20+ words). You can still continue.
+    </p>
+
+    <button id="step2-continue">Continue</button>
+  </section>
+
+  <!-- Loading state while the AI verdict is generated -->
+  <section id="step-loading" class="step">
+    <h1>Generating your second opinion&hellip;</h1>
+    <p>This will just take a moment.</p>
+  </section>
+
+  <!-- Step 5: Display verdict -->
+  <section id="step-5" class="step">
+    <h1>Here's a second opinion on your reasoning</h1>
+    <div class="content-block verdict-box" id="verdict-text"></div>
+    <button id="step5-continue">Continue</button>
+  </section>
+
+  <!-- Step 6: Post-verdict measures -->
+  <section id="step-6" class="step">
+    <h1>After reading that second opinion&hellip;</h1>
+
+    <fieldset>
+      <legend>{{ stance_question_post }}</legend>
+      <label class="radio-line"><input type="radio" name="post_stance" value="yes" required> Yes</label>
+      <label class="radio-line"><input type="radio" name="post_stance" value="no"> No</label>
+    </fieldset>
+
+    <fieldset>
+      <legend>How confident are you in this decision?</legend>
+      <div class="likert-scale labeled-scale">
+        {% for i in range(1, 8) %}
+        <label class="likert-option"><input type="radio" name="post_confidence" value="{{ i }}" required><span>{{ i }}</span></label>
+        {% endfor %}
+      </div>
+    </fieldset>
+
+    <label class="field-line">
+      In 2-4 sentences, explain your reasoning.
+      <textarea id="post_rationale" rows="5" required></textarea>
+    </label>
+    <p id="post_rationale_warning" class="warning-message" hidden>
+      That's a bit short — try to give a few more sentences of reasoning (aim for ~20+ words). You can still continue.
+    </p>
+
+    <h2>The second opinion you received&hellip;</h2>
+    <p>{{ trust_instructions }}</p>
+    <div class="likert-grid">
+      {% for item in trust_items %}
+        {{ likert_row('trust_' ~ loop.index, item, 7) }}
+      {% endfor %}
+    </div>
+
+    <div class="likert-grid">
+      {% for item in competence_items %}
+        {{ likert_row('competence_' ~ loop.index, item, 7) }}
+      {% endfor %}
+    </div>
+
+    <div class="likert-grid">
+      {% for item in bias_items %}
+        {{ likert_row('bias_' ~ loop.index, item, 7) }}
+      {% endfor %}
+    </div>
+
+    <div class="likert-grid">
+      {% for item in intention_items %}
+        {{ likert_row('intention_' ~ loop.index, item, 7) }}
+      {% endfor %}
+    </div>
+
+    <p class="error-message" id="step6-error"></p>
+    <button id="step6-continue">Continue</button>
+  </section>
+
+  <!-- Step 7: Debrief -->
+  <section id="step-7" class="step">
+    <h1>Debrief</h1>
+    <div class="content-block">{{ debrief_text }}</div>
+
+    <label class="field-line">
+      Any questions or concerns? (optional)
+      <textarea id="debrief_feedback" rows="3"></textarea>
+    </label>
+    <button id="step7-finish">Finish</button>
+  </section>
+
+  <!-- Final thank-you -->
+  <section id="step-done" class="step">
+    <h1>Thank you</h1>
+    <p>Your responses have been recorded. You may now close this window.</p>
+  </section>
+
+</div>
+
+<script>
+  window.STUDY_META = {
+    recruitmentSource: {{ recruitment_source | tojson }},
+    minimumAge: {{ minimum_age | tojson }},
+    financialLiteracyAnswers: {{ fin_lit_questions | map(attribute='correct_index') | list | tojson }},
+    scaleCounts: {
+      trust: {{ trust_items | length }},
+      competence: {{ competence_items | length }},
+      bias: {{ bias_items | length }},
+      intention: {{ intention_items | length }}
+    }
+  };
+</script>
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
