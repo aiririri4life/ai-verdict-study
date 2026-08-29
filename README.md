@@ -47,7 +47,7 @@ report/analyze separately).
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env   # then edit .env with your real ANTHROPIC_API_KEY
+cp .env.example .env   # then edit .env with your real OPENROUTER_API_KEY
                         # and a strong ADMIN_EXPORT_PASSWORD
 python app.py
 ```
@@ -73,10 +73,11 @@ Downloads everything as CSV, one row per participant, columns matching the
 2. On [render.com](https://render.com), New → Web Service → connect the repo.
 3. Build command: `pip install -r requirements.txt`
 4. Start command: `gunicorn app:app`
-5. Add environment variables in the Render dashboard: `ANTHROPIC_API_KEY`,
-   `ADMIN_EXPORT_PASSWORD`, `CONTACT_EMAIL`. (`CONTACT_EMAIL` isn't secret,
-   but it's set via env var rather than hardcoded in `config.py` since
-   that file is in a public repo.)
+5. Add environment variables in the Render dashboard: `OPENROUTER_API_KEY`,
+   `ADMIN_EXPORT_PASSWORD`, `CONTACT_EMAIL`. Optionally `AI_MODEL` if you
+   want a different OpenRouter model slug than the default in `app.py`.
+   (`CONTACT_EMAIL` isn't secret, but it's set via env var rather than
+   hardcoded in `config.py` since that file is in a public repo.)
 6. Render's free tier disk is ephemeral — the SQLite file will reset on
    redeploys/restarts. For a real data-collection run, either upgrade to a
    Render disk (small paid add-on) or periodically hit `/admin/export` and

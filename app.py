@@ -16,7 +16,7 @@ from dotenv import load_dotenv
 load_dotenv()  # must run before `import config` — config.py reads env vars at import time
 
 from flask import Flask, jsonify, render_template, request, Response
-import anthropic
+from openai import OpenAI
 
 import db
 import config
@@ -26,10 +26,22 @@ app = Flask(__name__)
 db.init_db()
 
 ADMIN_EXPORT_PASSWORD = os.environ.get("ADMIN_EXPORT_PASSWORD")
-ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY")
-AI_MODEL = os.environ.get("AI_MODEL", "claude-sonnet-4-5")
 
-anthropic_client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY) if ANTHROPIC_API_KEY else None
+# Using OpenRouter (an OpenAI-compatible gateway) rather than the Anthropic
+# API directly — OpenRouter doesn't speak Anthropic's native SDK format, so
+# this goes through the openai package's client pointed at OpenRouter's
+# base_url instead. AI_MODEL must be an OpenRouter model slug (provider
+# prefix included), e.g. "anthropic/claude-sonnet-4.5" — check
+# https://openrouter.ai/models for exact current slugs, and set AI_MODEL
+# in your .env / Render env vars if the default below is out of date.
+OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY")
+AI_MODEL = os.environ.get("AI_MODEL", "anthropic/claude-sonnet-4.5")
+
+openrouter_client = (
+    OpenAI(base_url="https://openrouter.ai/api/v1", api_key=OPENROUTER_API_KEY)
+    if OPENROUTER_API_KEY
+    else None
+)
 
 
 def now():
@@ -156,15 +168,15 @@ def api_generate_verdict():
         condition=participant["condition"],
     )
 
-    if anthropic_client is None:
-        return jsonify({"error": "ANTHROPIC_API_KEY not configured on the server"}), 500
+    if openrouter_client is None:
+        return jsonify({"error": "OPENROUTER_API_KEY not configured on the server"}), 500
 
-    message = anthropic_client.messages.create(
+    response = openrouter_client.chat.completions.create(
         model=AI_MODEL,
         max_tokens=300,
         messages=[{"role": "user", "content": prompt}],
     )
-    verdict_text = message.content[0].text
+    verdict_text = response.choices[0].message.content
 
     db.save_ai_verdict(participant_id, verdict_text, now())
     return jsonify({"verdict": verdict_text})
