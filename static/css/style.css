@@ -33,6 +33,21 @@ h2 { font-size: 1.1rem; margin-top: 28px; margin-bottom: 8px; }
 .scenario-box { border-left: 4px solid #4a67f5; }
 .verdict-box { border-left: 4px solid #f5a623; }
 
+.verdict-reference {
+  margin-bottom: 24px;
+}
+
+.verdict-reference summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: #4a67f5;
+  margin-bottom: 8px;
+}
+
+.verdict-reference .verdict-box {
+  margin-bottom: 0;
+}
+
 fieldset {
   border: none;
   padding: 0;

@@ -194,9 +194,14 @@ TRUST_INSTRUCTIONS = "Thinking about the analysis you just received, please rate
 # usually reported/analyzed separately, not folded into the trust
 # composite, per the original factor analysis. Consider reporting both
 # the 12-item and 11-item (dropping familiarity) composite.
+#
+# Item 2 below is reworded from the literal Jian et al. wording
+# ("behaves in an underhanded manner") to plain language — "underhanded"
+# read as confusing/unfamiliar to test participants. This is a deliberate
+# deviation from the source scale, unlike the "the system" phrasing above.
 TRUST_ITEMS = [
     "The system is deceptive.",                                    # 1 - reverse-scored
-    "The system behaves in an underhanded manner.",                 # 2 - reverse-scored
+    "The system behaves in a sneaky or dishonest way.",             # 2 - reverse-scored
     "I am suspicious of the system's intent, action, or outputs.",  # 3 - reverse-scored
     "I am wary of the system.",                                     # 4 - reverse-scored
     "The system's actions will have a harmful or injurious outcome.",  # 5 - reverse-scored

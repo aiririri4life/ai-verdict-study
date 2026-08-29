@@ -154,6 +154,10 @@ document.addEventListener("DOMContentLoaded", () => {
       participant_id: participantId,
     });
     document.getElementById("verdict-text").textContent = verdict;
+    // Also populate the collapsible reference copy on Step 6, so
+    // participants can re-read the verdict while answering the
+    // post-verdict questions instead of relying on memory.
+    document.getElementById("verdict-reference-text").textContent = verdict;
     showStep("step-5");
   });
 
