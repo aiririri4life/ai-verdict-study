@@ -1,9 +1,9 @@
 # Investment Reasoning Study
 
-Flask + SQLite web app for the AI-verdict study. Single-page multi-step
-form; see `app.py` for routes, `db.py` for the data model, and
-`randomization.py` for the condition-assignment logic (read that one first
-— it's the part the whole study's validity depends on, and
+Flask + libSQL (SQLite-compatible) web app for the AI-verdict study.
+Single-page multi-step form; see `app.py` for routes, `db.py` for the data
+model, and `randomization.py` for the condition-assignment logic (read
+that one first — it's the part the whole study's validity depends on, and
 `test_randomization.py` has the tests proving it).
 
 ## Before running a real study
@@ -55,8 +55,10 @@ python app.py
 Visit `http://localhost:5050`. Add `?src=classmates` (or whatever pool
 name) to tag recruitment source, e.g. `http://localhost:5050/?src=prolific`.
 
-`data/study.db` is created automatically on first run and is
-git-ignored — don't commit it, it contains response data.
+Without `TURSO_DATABASE_URL` set, `data/study.db` is created automatically
+on first run and is git-ignored — don't commit it, it contains response
+data. This local-file mode is only for development; see the deploy section
+below for why production needs Turso instead.
 
 ## Export data
 
@@ -67,6 +69,24 @@ http://localhost:5050/admin/export?password=YOUR_ADMIN_EXPORT_PASSWORD
 Downloads everything as CSV, one row per participant, columns matching the
 `participants` table in `db.py`.
 
+## Storage: why Turso, not just a local file
+
+Render's free tier (and most free hosts) has no persistent disk — local
+files get wiped on every redeploy *and* on spin-down after ~15 minutes of
+inactivity. That silently lost real participant data before this was
+fixed: two test runs a redeploy apart ended up with only one row in the
+export. `db.py` now connects directly to a remote
+[Turso](https://turso.tech) database (SQLite-compatible, free tier, no
+local file at all) whenever `TURSO_DATABASE_URL` is set, so every write
+lands somewhere durable immediately instead of on Render's disk. Without
+that env var set, it falls back to a local file — fine for development,
+not for a real data-collection run.
+
+To set up Turso: create a free account and a database at
+[turso.tech](https://turso.tech), then grab the database URL (starts with
+`libsql://`) and generate an auth token from its dashboard — both go in
+your `.env` locally and in Render's environment variables for production.
+
 ## Deploy free (Render)
 
 1. Push this repo to GitHub (data/ and .env are already git-ignored).
@@ -74,14 +94,14 @@ Downloads everything as CSV, one row per participant, columns matching the
 3. Build command: `pip install -r requirements.txt`
 4. Start command: `gunicorn app:app`
 5. Add environment variables in the Render dashboard: `OPENROUTER_API_KEY`,
-   `ADMIN_EXPORT_PASSWORD`, `CONTACT_EMAIL`. Optionally `AI_MODEL` if you
-   want a different OpenRouter model slug than the default in `app.py`.
-   (`CONTACT_EMAIL` isn't secret, but it's set via env var rather than
-   hardcoded in `config.py` since that file is in a public repo.)
-6. Render's free tier disk is ephemeral — the SQLite file will reset on
-   redeploys/restarts. For a real data-collection run, either upgrade to a
-   Render disk (small paid add-on) or periodically hit `/admin/export` and
-   save the CSV somewhere durable as you collect responses.
+   `ADMIN_EXPORT_PASSWORD`, `CONTACT_EMAIL`, `TURSO_DATABASE_URL`,
+   `TURSO_AUTH_TOKEN`. Optionally `AI_MODEL` if you want a different
+   OpenRouter model slug than the default in `app.py`. (`CONTACT_EMAIL`
+   isn't secret, but it's set via env var rather than hardcoded in
+   `config.py` since that file is in a public repo.)
+6. Without `TURSO_DATABASE_URL` set, the app still runs, but every
+   redeploy or spin-down wipes all collected data — see the storage
+   section above. Set it before collecting anything you care about.
 
 ## Notes on the design
 

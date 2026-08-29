@@ -1,25 +1,40 @@
 """
 Data model — one table, one row per participant, columns added as the
-participant moves through the steps. SQLite, single file, zero setup.
+participant moves through the steps.
 
 Why one wide table instead of several linked ones: this is a fixed-length
 survey (no repeating sections), so a normalized schema would just add joins
 without adding correctness. One row per participant also makes the CSV
-export in export.py trivial — it's the table, unmodified.
+export in app.py trivial — it's the table, unmodified.
+
+STORAGE: uses libsql (SQLite-compatible) via the `libsql` package, not the
+stdlib `sqlite3` module. If TURSO_DATABASE_URL is set, every read/write
+goes straight over the network to a remote Turso database — no local file
+at all. That's deliberate: Render's free tier wipes local disk on every
+redeploy and on spin-down after inactivity, which silently lost real
+participant data before this switch. If TURSO_DATABASE_URL is unset (e.g.
+local development), it falls back to a local SQLite file so you don't need
+a Turso account just to run this on your laptop.
+
+libsql's cursors return plain tuples, not sqlite3's dict-like Row objects
+— see _row_to_dict() below, which reconstructs column-name access from
+cursor.description so the rest of the codebase can keep doing row["column"].
 """
 
 import os
-import sqlite3
+import libsql
 from contextlib import contextmanager
 
-DB_PATH = "data/study.db"
+DB_PATH = "data/study.db"  # local fallback, only used when Turso isn't configured
+TURSO_DATABASE_URL = os.environ.get("TURSO_DATABASE_URL")
+TURSO_AUTH_TOKEN = os.environ.get("TURSO_AUTH_TOKEN")
 
-# The data/ directory is empty in the repo (its only contents are the
-# git-ignored .db file), and git doesn't track empty directories — so a
-# fresh checkout (e.g. Render's) has no data/ folder at all until this
-# runs. Without it, sqlite3.connect() fails with "unable to open database
-# file" rather than creating it.
-os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+if not TURSO_DATABASE_URL:
+    # Local-file fallback only: the data/ directory is empty in the repo
+    # (its only contents are the git-ignored .db file), and git doesn't
+    # track empty directories — so a fresh checkout has no data/ folder
+    # at all until this runs.
+    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS participants (
@@ -87,14 +102,22 @@ CREATE TABLE IF NOT EXISTS participants (
 
 @contextmanager
 def get_db():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA foreign_keys = ON")
+    if TURSO_DATABASE_URL:
+        conn = libsql.connect(TURSO_DATABASE_URL, auth_token=TURSO_AUTH_TOKEN)
+    else:
+        conn = libsql.connect(DB_PATH)
     try:
         yield conn
         conn.commit()
     finally:
         conn.close()
+
+
+def _row_to_dict(cursor, row):
+    """libsql cursors return plain tuples — this rebuilds dict-style
+    column access (row["column"]) from cursor.description, which is what
+    the rest of the codebase (app.py in particular) expects."""
+    return dict(zip((col[0] for col in cursor.description), row))
 
 
 def init_db():
@@ -103,11 +126,11 @@ def init_db():
 
 
 def column_names():
-    """Used by export.py to build the CSV header from the live schema,
-    so the export never drifts out of sync with the table."""
+    """Used by app.py's /admin/export to build the CSV header from the
+    live schema, so the export never drifts out of sync with the table."""
     with get_db() as conn:
         cur = conn.execute("PRAGMA table_info(participants)")
-        return [row["name"] for row in cur.fetchall()]
+        return [row[1] for row in cur.fetchall()]  # index 1 = column name
 
 
 # --- one explicit function per step ---------------------------------
@@ -182,7 +205,8 @@ def log_condition(participant_id, condition, timestamp):
 def get_participant(participant_id):
     with get_db() as conn:
         cur = conn.execute("SELECT * FROM participants WHERE id = ?", (participant_id,))
-        return cur.fetchone()
+        row = cur.fetchone()
+        return _row_to_dict(cur, row) if row else None
 
 
 def save_ai_verdict(participant_id, verdict_text, timestamp):
@@ -234,4 +258,4 @@ def save_debrief_feedback(participant_id, feedback_text, timestamp):
 def all_participants():
     with get_db() as conn:
         cur = conn.execute("SELECT * FROM participants ORDER BY created_at")
-        return cur.fetchall()
+        return [_row_to_dict(cur, row) for row in cur.fetchall()]
