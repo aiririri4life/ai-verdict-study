@@ -80,60 +80,99 @@ Your participant ID: {{{{PARTICIPANT_ID}}}}
 
 Questions or concerns: {CONTACT_EMAIL}. Thank you again for your time — this study wouldn't be possible without you."""
 
-# --- Step 4: AI verdict prompt template ---------------------------------
-# {scenario}, {stance}, {rationale}, {condition} are filled in by
-# build_verdict_prompt() in app.py. `condition` comes from randomization.py
-# via the DB — 'agree'/'disagree' — and is upper-cased to AGREE/DISAGREE
-# before being dropped into this template's INPUT section. Both branches'
-# instructions live in the template text itself; only the INPUT data
-# changes per participant, which is deliberate — the model is never asked
-# to independently judge the reasoning, only to write in the assigned
-# direction.
+# --- Step 4: AI verdict prompt (v2 — honest audit, no scripted verdict) ---
 #
-# Have Ben review this exact template before it touches real participants —
-# it's the piece with the most room for tone to go wrong.
-AI_PROMPT_TEMPLATE = """You are simulating the output of an investment-analysis AI tool that gives a
-second opinion on a user's investment reasoning. You will be given: (1) a fixed
-investment scenario, (2) a participant's Yes/No decision, (3) their stated
-reasoning, and (4) an assigned "condition" — either AGREE or DISAGREE.
+# This replaced an earlier version where the model was directly instructed
+# to output an AGREE or DISAGREE verdict regardless of reasoning quality.
+# This version never sees "agree"/"disagree" at all — it only sees
+# SCENARIO_FACTS and the participant's own REASONING, and is told to
+# genuinely audit whether the reasoning is "supported" or "unsupported"
+# by those facts, at temperature 0, in a fixed 4-sentence structure so
+# neither verdict type is longer or more dramatic than the other.
+#
+# The random condition draw (randomization.py) still exists and still
+# drives what the participant sees — but now it selects WHICH of two
+# fact-sets (below) the participant's reasoning gets audited against,
+# rather than instructing the model what to conclude. See
+# build_verdict_prompt() and api_generate_verdict() in app.py for the
+# selection logic.
+#
+# {scenario_facts} and {participant_reasoning} are filled in by
+# build_verdict_prompt() in app.py.
+AI_PROMPT_TEMPLATE = """You are generating a short verdict for a research study. A participant has
+just explained, in their own words, why they would or would not invest in
+a venture. You will audit that explanation against a fixed list of facts
+about the venture.
 
-Your task: write a short (3-5 sentence) analytical response, in the voice of a
-serious, professional investment-analysis tool, that is consistent with the
-assigned condition. Reference the participant's SPECIFIC stated reasoning by
-name — quote or closely paraphrase something they said — so the response feels
-targeted and responsive, not generic.
+Rules, in order of priority:
 
-If condition = AGREE: write a response that supports the participant's decision
-and reasoning, citing plausible-sounding analytical support (you may reference
-real elements of the scenario, e.g., the government contract or subscription
-growth, framed in a way that supports their stance).
+1. Use ONLY the facts provided in FACTS below. Do not introduce any detail,
+   number, name, organization, or claim that is not explicitly present in
+   FACTS or in the participant's REASONING. This includes not inventing
+   context (e.g., do not mention government contracts, funding sources,
+   legal status, or any other specific unless it appears verbatim in FACTS).
+2. Your verdict must evaluate whether the participant's stated REASONING is
+   well-supported by FACTS — not whether investing is a good idea in
+   general, and not your own opinion of the venture.
+3. Output exactly ONE verdict: "supported" or "unsupported". Do not hedge,
+   do not output "partially" or "mixed".
+4. Regardless of which verdict you output, your response must follow this
+   exact structure, in this order:
+   - One sentence stating the verdict plainly.
+   - Two sentences citing specific facts from FACTS that inform the verdict
+     (name the fact; do not paraphrase into something more dramatic or
+     more mild than the original wording).
+   - One closing sentence, in neutral tone, with no advice, no
+     encouragement, and no warning language beyond restating the verdict.
+5. Total output must be 4 sentences, no more, no fewer, for BOTH verdict
+   types. Do not let "unsupported" verdicts run longer or use stronger
+   language than "supported" verdicts, or vice versa. Match tone, sentence
+   length, and vocabulary register across both conditions as closely as
+   possible.
+6. Do not use intensifiers, hedges, or affect-laden words that don't appear
+   in FACTS or REASONING (e.g., "alarming," "reassuring," "risky,"
+   "solid," "concerning," "impressive"). Stick to descriptive, factual
+   language.
+7. Output plain text only. No markdown, no headers, no bullet points, no
+   JSON.
 
-If condition = DISAGREE: write a response that respectfully but clearly contests
-the participant's decision and reasoning, citing plausible-sounding analytical
-concerns grounded in the scenario (e.g., revenue concentration risk, the
-underperforming core business) framed in a way that challenges their stance.
+FACTS:
+{scenario_facts}
 
-IMPORTANT CONSTRAINTS:
-- The response must be assigned by the pre-determined condition, NOT by your own
-  independent judgment of whether their reasoning was actually good. Do not
-  evaluate correctness — only produce a response matching the assigned direction.
-- Keep tone analytical, respectful, and non-condescending in BOTH conditions —
-  never dismissive, never harsh, even when disagreeing.
-- Do not mention that this is a study, that the condition was randomly assigned,
-  or break character in any way.
-- Ground every claim in details actually present in the scenario — do not
-  invent new facts about TechFlow not given in the prompt.
-- 3-5 sentences, professional tone, no bullet points — write as flowing prose,
-  as if it's a short analyst note.
-
-INPUT:
-Scenario: {scenario}
-Participant's decision: {stance}
-Participant's stated reasoning: "{rationale}"
-Assigned condition: {condition}
-
-Write the analyst response now.
+REASONING (participant's own words):
+{participant_reasoning}
 """
+
+# API call settings for the verdict generation — see api_generate_verdict()
+# in app.py. temperature=0 and a fixed max_tokens backstop are part of the
+# spec, not incidental: output length/structure is meant to be fixed by
+# the prompt, and low temperature keeps the audit as deterministic as a
+# language model call can be.
+AI_TEMPERATURE = 0
+AI_MAX_TOKENS = 150
+
+# Two fact-sets per scenario, one per randomized condition. condition
+# 'agree' -> SCENARIO_FACTS_AGREE, 'disagree' -> SCENARIO_FACTS_DISAGREE
+# (see api_generate_verdict() in app.py). This is the actual experimental
+# manipulation now — the model genuinely audits, so the fact-set shown is
+# what steers the verdict, not an instruction to fake it.
+#
+# PLACEHOLDER — you need to write these yourself, not treat this as
+# ready-to-run content. Curating what counts as "the facts" per condition
+# is a research-validity decision (this is exactly what your own pilot
+# protocol's "invented specifics" check exists to catch), and every fact
+# you list must be true per the real SCENARIO_TEXT above — rule 1 in the
+# prompt above forbids the model from using anything not in this list, so
+# whatever you omit here effectively doesn't exist to the audit. Worth
+# discussing the curation approach with Ben before this touches real
+# participants, same as the prompt itself.
+SCENARIO_FACTS_AGREE = """[PLACEHOLDER — write the fact-set for the 'agree' condition. Bullet list of
+true facts from SCENARIO_TEXT, curated/framed so an honest audit tends to
+find typical reasoning "supported."]"""
+
+SCENARIO_FACTS_DISAGREE = """[PLACEHOLDER — write the fact-set for the 'disagree' condition. Bullet
+list of true facts from SCENARIO_TEXT, curated/framed so an honest audit
+tends to find typical reasoning "unsupported."]"""
 
 # --- Step 1: covariates ---------------------------------------------
 

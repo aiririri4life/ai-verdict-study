@@ -8,12 +8,20 @@ that one first — it's the part the whole study's validity depends on, and
 
 ## Before running a real study
 
-All content in `config.py` is filled in — consent text, scenario, debrief,
-covariates, and all five DV scales. Two things still need a human, not code:
+Most content in `config.py` is filled in — consent text, scenario, debrief,
+covariates, and all five DV scales. A few things still need a human, not code:
 
-- **Have Ben review `AI_PROMPT_TEMPLATE`** in `config.py` before it touches
-  real participants — it's the piece with the most room for tone to go
-  wrong (see the comment above it).
+- **Write `SCENARIO_FACTS_AGREE` and `SCENARIO_FACTS_DISAGREE`** in
+  `config.py` — currently placeholders. As of the v2 verdict prompt, the
+  AI genuinely audits the participant's reasoning against whichever
+  fact-set the random condition draw selects, rather than being told what
+  to conclude — so these two fact-sets ARE the experimental manipulation
+  now, and curating them (truthfully — every fact must trace back to
+  `SCENARIO_TEXT`) is a real research-validity decision, not filler text.
+  Run the blind-audit pilot described in the comment above
+  `AI_PROMPT_TEMPLATE` before real participants see this.
+- **Have Ben review `AI_PROMPT_TEMPLATE`** in `config.py`, and the fact-set
+  curation approach above, before either touches real participants.
 - **Flag the minors / parental-consent question to Ben.** The consent
   checkbox gates on self-attested age 13+ (enforced again numerically in
   Step 1 — see `MINIMUM_AGE` in `config.py`), which is reasonable for

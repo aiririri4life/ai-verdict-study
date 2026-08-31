@@ -135,19 +135,24 @@ def api_submit_stance():
     return jsonify({"ok": True})
 
 
-# --- Step 4: AI verdict --------------------------------------------------
+# --- Step 4: AI verdict (v2 — honest audit against a condition-selected
+# fact-set; see config.py's comment above AI_PROMPT_TEMPLATE) -------------
 
-def build_verdict_prompt(scenario, stance, rationale, condition):
+def scenario_facts_for_condition(condition):
+    """The random condition draw (randomization.py, via the DB) selects
+    WHICH fact-set the participant's reasoning is audited against — that
+    selection is the actual experimental manipulation now, since the
+    model is never told what verdict to reach. Never derived from
+    anything participant-authored."""
+    return config.SCENARIO_FACTS_AGREE if condition == "agree" else config.SCENARIO_FACTS_DISAGREE
+
+
+def build_verdict_prompt(scenario_facts, participant_reasoning):
     """Pure string-building, kept separate from the API call so it's easy
-    to read/test on its own. `condition` came from randomization.py via
-    the DB — never from the request. Both AGREE/DISAGREE instructions live
-    in AI_PROMPT_TEMPLATE itself; only the INPUT data (condition, upper-
-    cased) changes per participant."""
+    to read/test on its own."""
     return config.AI_PROMPT_TEMPLATE.format(
-        scenario=scenario.strip(),
-        stance=stance,
-        rationale=rationale,
-        condition=condition.upper(),
+        scenario_facts=scenario_facts.strip(),
+        participant_reasoning=participant_reasoning,
     )
 
 
@@ -156,18 +161,17 @@ def api_generate_verdict():
     data = request.get_json()
     participant_id = data["participant_id"]
 
-    # Read stance/rationale/condition from storage, not from the request,
-    # so the AI call always reflects what was actually recorded (and
-    # randomized) rather than whatever the client happens to send.
+    # Read condition/rationale from storage, not from the request, so the
+    # AI call always reflects what was actually recorded (and randomized)
+    # rather than whatever the client happens to send.
     participant = db.get_participant(participant_id)
     if participant is None or participant["condition"] is None:
         return jsonify({"error": "no condition assigned for this participant"}), 400
 
+    scenario_facts = scenario_facts_for_condition(participant["condition"])
     prompt = build_verdict_prompt(
-        scenario=config.SCENARIO_TEXT,
-        stance=participant["pre_stance"],
-        rationale=participant["pre_rationale"],
-        condition=participant["condition"],
+        scenario_facts=scenario_facts,
+        participant_reasoning=participant["pre_rationale"],
     )
 
     if openrouter_client is None:
@@ -175,8 +179,9 @@ def api_generate_verdict():
 
     response = openrouter_client.chat.completions.create(
         model=AI_MODEL,
-        max_tokens=300,
-        messages=[{"role": "user", "content": prompt}],
+        max_tokens=config.AI_MAX_TOKENS,
+        temperature=config.AI_TEMPERATURE,
+        messages=[{"role": "system", "content": prompt}],
     )
     verdict_text = response.choices[0].message.content
 
