@@ -344,6 +344,29 @@ INTENTION_ITEMS = [
     "I would trust this AI tool with a more important financial decision than this one.",
 ]
 
+# Instructed-response attention check — inserted as item 13 in the trust
+# grid template (templates/index.html), after the 11 composite + 1
+# familiarity item so participants have already settled into a response
+# pattern. NOT part of TRUST_ITEMS on purpose: it must never be scored
+# into the trust composite or counted as a 12th/13th trust item, it's a
+# gate, not a measure — stored in its own DB column
+# (attention_check_response), collected by its own field name
+# ("attention_check", not "trust_13") in app.js.
+#
+# The trust/competence/bias/intention grids currently show only bare
+# numbers 1-7 with no verbal anchor labels anywhere in the UI, so the
+# item text below states the label AND the number explicitly rather than
+# assuming "Somewhat agree" is visible on the scale itself. The mapping
+# assumes the intended (unlabeled) scale is a standard Strongly
+# Disagree(1)...Strongly Agree(7) agreement scale, consistent with
+# TRUST_INSTRUCTIONS above — "Somewhat agree" is one point above the
+# midpoint (4), i.e. 5.
+ATTENTION_CHECK_ITEM = (
+    "To confirm you are reading carefully, please select \"Somewhat "
+    "agree\" — the number 5 on this scale — for this item."
+)
+ATTENTION_CHECK_CORRECT_VALUE = 5
+
 # DV3 — Advice-taking / Weight-on-Advice is NOT asked directly; it's
 # computed from pre_stance vs. post_stance (switch rate, broken out by
 # condition and switch direction) and pre_confidence vs. post_confidence

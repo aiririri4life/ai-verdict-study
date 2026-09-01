@@ -93,11 +93,33 @@ CREATE TABLE IF NOT EXISTS participants (
 
     intention_1 INTEGER, intention_2 INTEGER, intention_3 INTEGER,  -- item 3 optional
 
+    -- Instructed-response attention check, embedded as item 13 in the
+    -- trust grid (after the 11 composite + familiarity items) — NOT a
+    -- trust item, not part of that composite. 1-7, same scale as the
+    -- trust grid. Correct response is defined by
+    -- config.ATTENTION_CHECK_CORRECT_VALUE ("Somewhat agree" = 5 on a
+    -- Strongly Disagree(1)...Strongly Agree(7) scale). Excluded before
+    -- analysis: any response other than the correct value should drop
+    -- that participant's row, applied identically across both conditions.
+    attention_check_response INTEGER,
+
     -- Step 7: debrief
     debrief_feedback TEXT,
     completed_at TEXT
 );
 """
+
+# ADD COLUMN migrations for the live Turso table, which already existed
+# before this field was added — CREATE TABLE IF NOT EXISTS above is a
+# no-op against an existing table, so new columns need an explicit
+# migration or they'd only ever apply to a brand-new database. Each is
+# run once per process (see the _schema_ready guard in get_db()) and
+# tolerates already having been applied (e.g. after a redeploy) by
+# catching libsql's "duplicate column name" error specifically — any
+# other failure still surfaces normally rather than being swallowed.
+MIGRATIONS = [
+    "ALTER TABLE participants ADD COLUMN attention_check_response INTEGER",
+]
 
 
 # Set once per worker process, the first time get_db() actually opens a
@@ -125,6 +147,12 @@ def get_db():
 
     if not _schema_ready:
         conn.execute(SCHEMA)
+        for migration in MIGRATIONS:
+            try:
+                conn.execute(migration)
+            except ValueError as e:
+                if "duplicate column name" not in str(e):
+                    raise  # a real failure, not just "already migrated"
         conn.commit()
         _schema_ready = True
 
@@ -243,10 +271,13 @@ def save_ai_verdict(participant_id, verdict_text, timestamp):
 
 
 def save_post_verdict(participant_id, stance, confidence, rationale,
-                       trust_items, competence_items, bias_items, intention_items):
+                       trust_items, competence_items, bias_items, intention_items,
+                       attention_check_response):
     """trust_items: list of up to 12 ints. competence_items: up to 5.
     bias_items: up to 3. intention_items: up to 3. Missing trailing optional
-    items should be passed as None."""
+    items should be passed as None. attention_check_response: the raw 1-7
+    response to the instructed-response item — stored separately from
+    trust_items on purpose, it is not part of that composite."""
     def pad(items, length):
         items = list(items) + [None] * (length - len(items))
         return items[:length]
@@ -265,10 +296,12 @@ def save_post_verdict(participant_id, stance, confidence, rationale,
                 trust_7=?, trust_8=?, trust_9=?, trust_10=?, trust_11=?, trust_12=?,
                 competence_1=?, competence_2=?, competence_3=?, competence_4=?, competence_5=?,
                 bias_1=?, bias_2=?, bias_3=?,
-                intention_1=?, intention_2=?, intention_3=?
+                intention_1=?, intention_2=?, intention_3=?,
+                attention_check_response=?
             WHERE id = ?
             """,
-            (stance, confidence, rationale, *trust, *competence, *bias, *intention, participant_id),
+            (stance, confidence, rationale, *trust, *competence, *bias, *intention,
+             attention_check_response, participant_id),
         )
 
 

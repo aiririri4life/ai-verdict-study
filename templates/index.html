@@ -184,6 +184,11 @@
       {% for item in trust_items %}
         {{ likert_row('trust_' ~ loop.index, item, 7) }}
       {% endfor %}
+      {# Instructed-response attention check — item 13, after the real
+         trust items so participants have settled into a response
+         pattern. Deliberately named "attention_check", not "trust_13":
+         it must never be collected or scored as a trust item. #}
+      {{ likert_row('attention_check', attention_check_item, 7) }}
     </div>
 
     <div class="likert-grid">

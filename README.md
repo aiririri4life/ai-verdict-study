@@ -53,6 +53,25 @@ Scoring notes live as comments right above `TRUST_ITEMS` and `BIAS_ITEMS`
 in `config.py` (which items are reverse-scored, which item to
 report/analyze separately).
 
+### Pre-registered exclusion rules
+
+Applied identically across both conditions:
+
+- **Attention check.** Item 13 in the trust grid (`config.ATTENTION_CHECK_ITEM`),
+  stored in its own `attention_check_response` column — not part of the
+  trust composite. Exclude any row where this doesn't equal
+  `config.ATTENTION_CHECK_CORRECT_VALUE` (5, "Somewhat agree"). Not
+  enforced live — a wrong answer is still recorded and the participant
+  proceeds normally; the exclusion happens at analysis time, from the
+  CSV export.
+- **Completion-time floor.** No new column needed — compute from
+  `consent_timestamp` and `completed_at`, both already in every export.
+  A defensible pre-registered floor is **under 2 minutes (120s)** total
+  survey time, roughly a third of the ~5-10 minute expected honest
+  completion time (the standard heuristic for catching speeders without
+  over-excluding genuinely fast responses). Tighten this once you have
+  real pilot completion-time data to calibrate against.
+
 ## Run locally
 
 ```bash

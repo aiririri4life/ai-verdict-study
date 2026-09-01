@@ -85,6 +85,7 @@ def index():
         competence_items=config.COMPETENCE_ITEMS,
         bias_items=config.BIAS_ITEMS,
         intention_items=config.INTENTION_ITEMS,
+        attention_check_item=config.ATTENTION_CHECK_ITEM,
     )
 
 
@@ -236,6 +237,7 @@ def api_post_verdict():
         competence_items=data["competence_items"],
         bias_items=data["bias_items"],
         intention_items=data["intention_items"],
+        attention_check_response=data["attention_check_response"],
     )
     return jsonify({"ok": True})
 

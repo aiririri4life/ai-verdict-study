@@ -214,12 +214,19 @@ document.addEventListener("DOMContentLoaded", () => {
     const competenceItems = collectLikertRange("competence", competence);
     const biasItems = collectLikertRange("bias", bias);
     const intentionItems = collectLikertRange("intention", intention);
+    // Collected and sent separately from trustItems on purpose — it's an
+    // instructed-response attention check, not a 13th trust item, and
+    // must never be folded into that composite. Not gated live (wrong
+    // answers still get recorded and submitted normally); the exclusion
+    // happens at analysis time, not here — see config.py's comment on
+    // ATTENTION_CHECK_ITEM.
+    const attentionCheckResponse = getRadioValue("attention_check");
 
     const allScalesAnswered = [trustItems, competenceItems, biasItems, intentionItems].every(
       (arr) => !arr.includes(null)
     );
 
-    if (!stance || !confidence || !rationale || !allScalesAnswered) {
+    if (!stance || !confidence || !rationale || !allScalesAnswered || !attentionCheckResponse) {
       errorEl.textContent = "Please answer every question before continuing.";
       return;
     }
@@ -233,6 +240,7 @@ document.addEventListener("DOMContentLoaded", () => {
       competence_items: competenceItems,
       bias_items: biasItems,
       intention_items: intentionItems,
+      attention_check_response: parseInt(attentionCheckResponse, 10),
     });
 
     // The debrief text (config.py) contains the literal token
