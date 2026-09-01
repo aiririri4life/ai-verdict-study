@@ -192,11 +192,21 @@ REASONING (participant's own words):
 
 # API call settings for the verdict generation — see api_generate_verdict()
 # in app.py. temperature=0 and a fixed max_tokens backstop are part of the
-# spec, not incidental: output length/structure is meant to be fixed by
-# the prompt, and low temperature keeps the audit as deterministic as a
-# language model call can be.
+# original spec, not incidental: output length/structure is meant to be
+# fixed by the prompt, and low temperature keeps the audit as
+# deterministic as a language model call can be.
+#
+# AI_MAX_TOKENS raised from the spec's original 150 after a live test cut
+# off mid-sentence ("The participant" and nothing else) — gemini-3.6-flash
+# is a reasoning-capable model that spends tokens on internal "thinking"
+# before producing visible output, and that thinking counts against
+# max_tokens, so a small budget can get consumed before any of the actual
+# 4-sentence answer appears. Raised generously to give room for both; the
+# prompt's own 4-sentence rule is still what keeps the VISIBLE answer
+# short, not this number — same "backstop, not a lever" intent as before,
+# just recalibrated for a model that spends tokens differently.
 AI_TEMPERATURE = 0
-AI_MAX_TOKENS = 150
+AI_MAX_TOKENS = 1024
 
 # Two fact-sets per scenario, one per randomized condition. condition
 # 'agree' -> SCENARIO_FACTS_AGREE, 'disagree' -> SCENARIO_FACTS_DISAGREE
