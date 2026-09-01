@@ -80,7 +80,7 @@ Your participant ID: {{{{PARTICIPANT_ID}}}}
 
 Questions or concerns: {CONTACT_EMAIL}. Thank you again for your time — this study wouldn't be possible without you."""
 
-# --- Step 4: AI verdict prompt (v2 — honest audit, no scripted verdict) ---
+# --- Step 4: AI verdict prompt (v2.1 — honest audit, no scripted verdict) -
 #
 # This replaced an earlier version where the model was directly instructed
 # to output an AGREE or DISAGREE verdict regardless of reasoning quality.
@@ -89,6 +89,21 @@ Questions or concerns: {CONTACT_EMAIL}. Thank you again for your time — this s
 # genuinely audit whether the reasoning is "supported" or "unsupported"
 # by those facts, at temperature 0, in a fixed 4-sentence structure so
 # neither verdict type is longer or more dramatic than the other.
+#
+# v2.1 revision note: the first real pilot run (against placeholder FACTS,
+# so the model fell back on details from the participant's own REASONING)
+# surfaced three failure modes the v2 prompt didn't prevent: the model
+# never used the literal word "supported"/"unsupported" anywhere, it wrote
+# in second person as a "second opinion to you" (the OLD prompt's voice),
+# and it fabricated generalized industry claims not present in FACTS or
+# REASONING (e.g. "public sector contracts often lead to multi-year
+# revenue streams" — invented background knowledge, not a cited fact).
+# v2.1 adds: a rigid required first sentence (so the verdict word is
+# mechanically guaranteed to appear), an explicit third-person/no-"you"
+# rule, an explicit ban on general/background claims, and a worked
+# example pair using a fictional company so the model has a concrete
+# structural template to match rather than inferring the shape from prose
+# rules alone. Re-pilot this version the same way before trusting it.
 #
 # The random condition draw (randomization.py) still exists and still
 # drives what the participant sees — but now it selects WHICH of two
@@ -111,30 +126,62 @@ Rules, in order of priority:
    FACTS or in the participant's REASONING. This includes not inventing
    context (e.g., do not mention government contracts, funding sources,
    legal status, or any other specific unless it appears verbatim in FACTS).
-2. Your verdict must evaluate whether the participant's stated REASONING is
+2. Do not add general or background claims about how companies, markets,
+   or industries "typically" or "often" behave, even if true in general.
+   Every claim in your response must trace to a specific line in FACTS or
+   REASONING — not to outside knowledge, however plausible-sounding.
+3. Your verdict must evaluate whether the participant's stated REASONING is
    well-supported by FACTS — not whether investing is a good idea in
    general, and not your own opinion of the venture.
-3. Output exactly ONE verdict: "supported" or "unsupported". Do not hedge,
+4. Output exactly ONE verdict: "supported" or "unsupported". Do not hedge,
    do not output "partially" or "mixed".
-4. Regardless of which verdict you output, your response must follow this
-   exact structure, in this order:
-   - One sentence stating the verdict plainly.
-   - Two sentences citing specific facts from FACTS that inform the verdict
+5. Write in third person, describing the participant and their reasoning.
+   Do not address the participant directly — never use "you" or "your".
+6. Your response must follow this exact structure, in this order, and the
+   first sentence must use this exact template with the bracket filled in:
+   - Sentence 1 (verbatim template): "The participant's reasoning is
+     [supported/unsupported] by the facts." — replace the bracket with
+     exactly one of those two words, nothing else changed.
+   - Sentences 2-3: cite specific facts from FACTS that inform the verdict
      (name the fact; do not paraphrase into something more dramatic or
      more mild than the original wording).
-   - One closing sentence, in neutral tone, with no advice, no
+   - Sentence 4: a closing sentence, in neutral tone, with no advice, no
      encouragement, and no warning language beyond restating the verdict.
-5. Total output must be 4 sentences, no more, no fewer, for BOTH verdict
-   types. Do not let "unsupported" verdicts run longer or use stronger
-   language than "supported" verdicts, or vice versa. Match tone, sentence
-   length, and vocabulary register across both conditions as closely as
-   possible.
-6. Do not use intensifiers, hedges, or affect-laden words that don't appear
+7. Total output must be exactly 4 sentences for BOTH verdict types. Do not
+   let "unsupported" verdicts run longer or use stronger language than
+   "supported" verdicts, or vice versa. Match tone, sentence length, and
+   vocabulary register across both conditions as closely as possible.
+8. Do not use intensifiers, hedges, or affect-laden words that don't appear
    in FACTS or REASONING (e.g., "alarming," "reassuring," "risky,"
-   "solid," "concerning," "impressive"). Stick to descriptive, factual
-   language.
-7. Output plain text only. No markdown, no headers, no bullet points, no
+   "solid," "concerning," "impressive," "genuine," "substantial,"
+   "deliberate"). Stick to descriptive, factual language.
+9. Output plain text only. No markdown, no headers, no bullet points, no
    JSON.
+
+EXAMPLE (fictional company, for structure only — do not reuse this
+content, these facts do not apply to the real task below):
+
+FACTS:
+- Meridian Foods' stock price fell 12% over the past year.
+- Meridian's flagship product line was discontinued six months ago.
+- Meridian added two new product lines this year, which together account
+  for 8% of total revenue.
+- Meridian's CEO stated in a press release that the company is focused on
+  stabilizing existing operations before pursuing new products.
+
+REASONING: "I wouldn't invest because the stock has been dropping and they
+just cancelled their main product."
+
+CORRECT OUTPUT: "The participant's reasoning is supported by the facts.
+The stock price fell 12% over the past year, and the flagship product
+line was discontinued six months ago, both of which the participant
+cited. These two facts correspond directly to the stock decline and
+product cancellation referenced in the reasoning. No fact in the list
+contradicts this reasoning."
+
+Now do the same for the real task below. Use ONLY the facts given, follow
+the required first-sentence template, write in third person, and produce
+exactly 4 sentences.
 
 FACTS:
 {scenario_facts}
