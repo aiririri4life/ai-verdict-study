@@ -196,17 +196,18 @@ REASONING (participant's own words):
 # fixed by the prompt, and low temperature keeps the audit as
 # deterministic as a language model call can be.
 #
-# AI_MAX_TOKENS raised from the spec's original 150 after a live test cut
-# off mid-sentence ("The participant" and nothing else) — gemini-3.6-flash
-# is a reasoning-capable model that spends tokens on internal "thinking"
-# before producing visible output, and that thinking counts against
-# max_tokens, so a small budget can get consumed before any of the actual
-# 4-sentence answer appears. Raised generously to give room for both; the
-# prompt's own 4-sentence rule is still what keeps the VISIBLE answer
-# short, not this number — same "backstop, not a lever" intent as before,
-# just recalibrated for a model that spends tokens differently.
+# AI_MAX_TOKENS raised from the spec's original 150 after two live tests
+# both cut off mid-sentence — first at "The participant" (150 tokens),
+# then mid-second-sentence (1024 tokens) — gemini-3.6-flash is a
+# reasoning-capable model that spends tokens on internal "thinking" before
+# producing visible output, and that thinking counts against max_tokens.
+# 1024 still wasn't enough headroom, so jumping further rather than
+# creeping up one redeploy at a time. The prompt's own 4-sentence rule is
+# still what keeps the VISIBLE answer short, not this number — same
+# "backstop, not a lever" intent as before, just recalibrated again for a
+# model that spends tokens on reasoning more than initially expected.
 AI_TEMPERATURE = 0
-AI_MAX_TOKENS = 1024
+AI_MAX_TOKENS = 4096
 
 # Two fact-sets per scenario, one per randomized condition. condition
 # 'agree' -> SCENARIO_FACTS_AGREE, 'disagree' -> SCENARIO_FACTS_DISAGREE
