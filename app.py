@@ -187,11 +187,18 @@ def api_generate_verdict():
     if ai_client is None:
         return jsonify({"error": "GEMINI_API_KEY not configured on the server"}), 500
 
+    # A system-only message array (no "user" turn) worked fine against
+    # OpenRouter/Claude, but Gemini's OpenAI-compat layer rejects it with
+    # "GenerateContentRequest.contents is not specified" — its system role
+    # maps to a separate field, not to `contents`, so `contents` ends up
+    # empty with nothing else in the array. Sending everything as a single
+    # "user" message works universally across providers, which matters
+    # now that we're on our second provider swap.
     response = ai_client.chat.completions.create(
         model=AI_MODEL,
         max_tokens=config.AI_MAX_TOKENS,
         temperature=config.AI_TEMPERATURE,
-        messages=[{"role": "system", "content": prompt}],
+        messages=[{"role": "user", "content": prompt}],
     )
     verdict_text = response.choices[0].message.content
 
