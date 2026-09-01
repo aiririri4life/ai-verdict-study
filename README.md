@@ -59,7 +59,7 @@ report/analyze separately).
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env   # then edit .env with your real OPENROUTER_API_KEY
+cp .env.example .env   # then edit .env with your real GEMINI_API_KEY
                         # and a strong ADMIN_EXPORT_PASSWORD
 python app.py
 ```
@@ -105,12 +105,14 @@ your `.env` locally and in Render's environment variables for production.
 2. On [render.com](https://render.com), New → Web Service → connect the repo.
 3. Build command: `pip install -r requirements.txt`
 4. Start command: `gunicorn app:app`
-5. Add environment variables in the Render dashboard: `OPENROUTER_API_KEY`,
+5. Add environment variables in the Render dashboard: `GEMINI_API_KEY`,
    `ADMIN_EXPORT_PASSWORD`, `CONTACT_EMAIL`, `TURSO_DATABASE_URL`,
-   `TURSO_AUTH_TOKEN`. Optionally `AI_MODEL` if you want a different
-   OpenRouter model slug than the default in `app.py`. (`CONTACT_EMAIL`
-   isn't secret, but it's set via env var rather than hardcoded in
-   `config.py` since that file is in a public repo.)
+   `TURSO_AUTH_TOKEN`. Optionally `AI_MODEL` if the default Gemini model
+   slug in `app.py` is out of date — check
+   [ai.google.dev/gemini-api/docs/models](https://ai.google.dev/gemini-api/docs/models)
+   for the current list. (`CONTACT_EMAIL` isn't secret, but it's set via
+   env var rather than hardcoded in `config.py` since that file is in a
+   public repo.)
 6. Without `TURSO_DATABASE_URL` set, the app still runs, but every
    redeploy or spin-down wipes all collected data — see the storage
    section above. Set it before collecting anything you care about.

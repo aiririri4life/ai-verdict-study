@@ -29,19 +29,29 @@ app = Flask(__name__)
 
 ADMIN_EXPORT_PASSWORD = os.environ.get("ADMIN_EXPORT_PASSWORD")
 
-# Using OpenRouter (an OpenAI-compatible gateway) rather than the Anthropic
-# API directly — OpenRouter doesn't speak Anthropic's native SDK format, so
-# this goes through the openai package's client pointed at OpenRouter's
-# base_url instead. AI_MODEL must be an OpenRouter model slug (provider
-# prefix included), e.g. "anthropic/claude-sonnet-4.5" — check
-# https://openrouter.ai/models for exact current slugs, and set AI_MODEL
-# in your .env / Render env vars if the default below is out of date.
-OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY")
-AI_MODEL = os.environ.get("AI_MODEL", "anthropic/claude-sonnet-4.5")
+# Switched from OpenRouter to Gemini's free tier — OpenRouter has no
+# durable free tier (a negative account balance blocked every request
+# mid-pilot). Google's Gemini API has an actual free tier, and exposes an
+# OpenAI-compatible endpoint, so this still goes through the same openai
+# package's client, just pointed at Google's base_url with a Gemini model
+# name and a Gemini API key instead of an OpenRouter one.
+#
+# I could not verify the exact current default model name against live
+# docs when writing this (no working web access at the time) — if
+# AI_MODEL's default below 404s or errors on model-not-found, check
+# https://ai.google.dev/gemini-api/docs/models for the current model list
+# and set AI_MODEL in your .env / Render env vars to the right one. The
+# rest of the integration (endpoint shape, auth) should be stable even if
+# the specific model name has moved on.
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+AI_MODEL = os.environ.get("AI_MODEL", "gemini-2.0-flash")
 
-openrouter_client = (
-    OpenAI(base_url="https://openrouter.ai/api/v1", api_key=OPENROUTER_API_KEY)
-    if OPENROUTER_API_KEY
+ai_client = (
+    OpenAI(
+        base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
+        api_key=GEMINI_API_KEY,
+    )
+    if GEMINI_API_KEY
     else None
 )
 
@@ -174,10 +184,10 @@ def api_generate_verdict():
         participant_reasoning=participant["pre_rationale"],
     )
 
-    if openrouter_client is None:
-        return jsonify({"error": "OPENROUTER_API_KEY not configured on the server"}), 500
+    if ai_client is None:
+        return jsonify({"error": "GEMINI_API_KEY not configured on the server"}), 500
 
-    response = openrouter_client.chat.completions.create(
+    response = ai_client.chat.completions.create(
         model=AI_MODEL,
         max_tokens=config.AI_MAX_TOKENS,
         temperature=config.AI_TEMPERATURE,

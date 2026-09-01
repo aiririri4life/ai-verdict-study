@@ -10,7 +10,7 @@ and debrief text before running a real study.
 import os
 
 # --- contact email, used in both consent and debrief text below ---------
-# Read from the environment (like OPENROUTER_API_KEY / ADMIN_EXPORT_PASSWORD)
+# Read from the environment (like GEMINI_API_KEY / ADMIN_EXPORT_PASSWORD)
 # rather than hardcoded here, since this file is committed to a public
 # repo — set the real value in .env locally and in Render's dashboard.
 CONTACT_EMAIL = os.environ.get("CONTACT_EMAIL", "[CONTACT_EMAIL not set]")
