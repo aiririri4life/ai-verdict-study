@@ -284,3 +284,17 @@ def all_participants():
     with get_db() as conn:
         cur = conn.execute("SELECT * FROM participants ORDER BY created_at")
         return [_row_to_dict(cur, row) for row in cur.fetchall()]
+
+
+def delete_participants_except(recruitment_source_to_keep):
+    """One-off cleanup helper for clearing out test/pilot data before real
+    collection starts — deletes every row whose recruitment_source doesn't
+    exactly match the given value. Used via the temporary /admin/cleanup
+    route in app.py; both should be removed once that specific cleanup is
+    done, not kept as a standing bulk-delete capability."""
+    with get_db() as conn:
+        cur = conn.execute(
+            "DELETE FROM participants WHERE recruitment_source IS NULL OR recruitment_source != ?",
+            (recruitment_source_to_keep,),
+        )
+        return cur.rowcount

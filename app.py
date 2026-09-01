@@ -273,5 +273,21 @@ def admin_export():
     )
 
 
+# --- TEMPORARY: one-off pilot-data cleanup ---------------------------------
+# Deletes every participant row except the pilot-audit-batch-3 ones, to
+# clear out earlier test/pilot rows before real data collection starts.
+# Remove this route (and delete_participants_except() in db.py) once
+# you've run it once — this is scoped to today's specific cleanup, not
+# meant to be a standing bulk-delete capability left in a live app.
+@app.route("/admin/cleanup", methods=["POST"])
+def admin_cleanup():
+    supplied = request.args.get("password", "")
+    if not ADMIN_EXPORT_PASSWORD or not secrets.compare_digest(supplied, ADMIN_EXPORT_PASSWORD):
+        return "Unauthorized", 401
+
+    deleted_count = db.delete_participants_except("pilot-audit-batch-3")
+    return jsonify({"deleted": deleted_count})
+
+
 if __name__ == "__main__":
     app.run(debug=True, port=int(os.environ.get("PORT", 5050)))
