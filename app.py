@@ -36,15 +36,15 @@ ADMIN_EXPORT_PASSWORD = os.environ.get("ADMIN_EXPORT_PASSWORD")
 # package's client, just pointed at Google's base_url with a Gemini model
 # name and a Gemini API key instead of an OpenRouter one.
 #
-# I could not verify the exact current default model name against live
-# docs when writing this (no working web access at the time) — if
-# AI_MODEL's default below 404s or errors on model-not-found, check
-# https://ai.google.dev/gemini-api/docs/models for the current model list
-# and set AI_MODEL in your .env / Render env vars to the right one. The
-# rest of the integration (endpoint shape, auth) should be stable even if
-# the specific model name has moved on.
+# Model name confirmed live against a real key: "gemini-2.0-flash" (my
+# original guess, written with no working web access) came back
+# deprecated — "This model models/gemini-2.0-flash is no longer
+# available... use models/gemini-3.6-flash" — straight from Google's own
+# API error, not guessed. If this drifts again, check
+# https://ai.google.dev/gemini-api/docs/models or just read the error;
+# Google's 404 messages name the current replacement directly.
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
-AI_MODEL = os.environ.get("AI_MODEL", "gemini-2.0-flash")
+AI_MODEL = os.environ.get("AI_MODEL", "gemini-3.6-flash")
 
 ai_client = (
     OpenAI(
