@@ -204,22 +204,32 @@ AI_MAX_TOKENS = 150
 # manipulation now — the model genuinely audits, so the fact-set shown is
 # what steers the verdict, not an instruction to fake it.
 #
-# PLACEHOLDER — you need to write these yourself, not treat this as
-# ready-to-run content. Curating what counts as "the facts" per condition
-# is a research-validity decision (this is exactly what your own pilot
-# protocol's "invented specifics" check exists to catch), and every fact
-# you list must be true per the real SCENARIO_TEXT above — rule 1 in the
-# prompt above forbids the model from using anything not in this list, so
-# whatever you omit here effectively doesn't exist to the audit. Worth
-# discussing the curation approach with Ben before this touches real
-# participants, same as the prompt itself.
-SCENARIO_FACTS_AGREE = """[PLACEHOLDER — write the fact-set for the 'agree' condition. Bullet list of
-true facts from SCENARIO_TEXT, curated/framed so an honest audit tends to
-find typical reasoning "supported."]"""
+# DRAFT — needs your and Ben's review before real participants see it,
+# same as the prompt itself. Every line below is true per SCENARIO_TEXT;
+# nothing is invented or altered. The two sets differ only in WHICH true
+# facts are included: AGREE gets the growth-case facts (stock price, the
+# contract win, the CEO's forward-looking quote), DISAGREE gets the
+# risk-case facts (core-business underperformance vs. industry benchmark,
+# revenue concentration, the same CEO quote — now relevant as continued
+# reliance on that concentration). Rule 1 in the prompt above means
+# whatever's NOT in a given set effectively doesn't exist to that audit —
+# that's the actual lever making this work, not fabrication, but it has a
+# real consequence worth being explicit about: a participant who reasons
+# well but cites facts outside their assigned set (e.g. an astute "no"
+# grounded in concentration risk, audited against the AGREE set that
+# omits it) can come back "unsupported" for reasons that have nothing to
+# do with whether their reasoning was actually good. That's expected and
+# fine for THIS study's actual question (does disagreement suppress
+# trust regardless of merit?) — it would NOT be fine if you ever wanted
+# "supported/unsupported" to double as a genuine reasoning-quality
+# measure. Worth being explicit about that distinction in your write-up.
+SCENARIO_FACTS_AGREE = """- TechFlow Inc.'s stock price has risen 40% over the past year.
+- TechFlow signed a large government contract 8 months ago, which now accounts for 35% of TechFlow's total revenue this year.
+- TechFlow's CEO stated in an earnings call that the company is "exploring additional government partnerships to build on this momentum.\""""
 
-SCENARIO_FACTS_DISAGREE = """[PLACEHOLDER — write the fact-set for the 'disagree' condition. Bullet
-list of true facts from SCENARIO_TEXT, curated/framed so an honest audit
-tends to find typical reasoning "unsupported."]"""
+SCENARIO_FACTS_DISAGREE = """- TechFlow's core subscription business (its original product line) grew only 3% over the past year, compared with an industry average growth rate of 12% for comparable subscription businesses.
+- Almost all of TechFlow's revenue growth this year has come from one large government contract signed 8 months ago, which now accounts for 35% of TechFlow's total revenue this year.
+- TechFlow's CEO stated in an earnings call that the company is "exploring additional government partnerships to build on this momentum.\""""
 
 # --- Step 1: covariates ---------------------------------------------
 

@@ -11,15 +11,19 @@ that one first — it's the part the whole study's validity depends on, and
 Most content in `config.py` is filled in — consent text, scenario, debrief,
 covariates, and all five DV scales. A few things still need a human, not code:
 
-- **Write `SCENARIO_FACTS_AGREE` and `SCENARIO_FACTS_DISAGREE`** in
-  `config.py` — currently placeholders. As of the v2 verdict prompt, the
-  AI genuinely audits the participant's reasoning against whichever
-  fact-set the random condition draw selects, rather than being told what
-  to conclude — so these two fact-sets ARE the experimental manipulation
-  now, and curating them (truthfully — every fact must trace back to
-  `SCENARIO_TEXT`) is a real research-validity decision, not filler text.
-  Run the blind-audit pilot described in the comment above
-  `AI_PROMPT_TEMPLATE` before real participants see this.
+- **Review `SCENARIO_FACTS_AGREE` and `SCENARIO_FACTS_DISAGREE`** in
+  `config.py` — drafted, not placeholders, but not vetted either. As of
+  the v2 verdict prompt, the AI genuinely audits the participant's
+  reasoning against whichever fact-set the random condition draw selects,
+  rather than being told what to conclude — so these two fact-sets ARE
+  the experimental manipulation now. They're split by which true facts
+  each includes (growth-case vs. risk-case), not by tone, per the comment
+  above them — read that comment, it spells out a real consequence: a
+  participant with genuinely good reasoning can still come back
+  "unsupported" if they cited a fact outside their assigned set. That's
+  fine for this study's actual question, but worth being explicit about
+  in any write-up. Run the blind-audit pilot described in the comment
+  above `AI_PROMPT_TEMPLATE` before real participants see this.
 - **Have Ben review `AI_PROMPT_TEMPLATE`** in `config.py`, and the fact-set
   curation approach above, before either touches real participants.
 - **Flag the minors / parental-consent question to Ben.** The consent
