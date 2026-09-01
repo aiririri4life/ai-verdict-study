@@ -16,6 +16,7 @@ from dotenv import load_dotenv
 load_dotenv()  # must run before `import config` — config.py reads env vars at import time
 
 from flask import Flask, jsonify, render_template, request, Response
+import openai
 from openai import OpenAI
 
 import db
@@ -194,12 +195,27 @@ def api_generate_verdict():
     # empty with nothing else in the array. Sending everything as a single
     # "user" message works universally across providers, which matters
     # now that we're on our second provider swap.
-    response = ai_client.chat.completions.create(
-        model=AI_MODEL,
-        max_tokens=config.AI_MAX_TOKENS,
-        temperature=config.AI_TEMPERATURE,
-        messages=[{"role": "user", "content": prompt}],
-    )
+    try:
+        response = ai_client.chat.completions.create(
+            model=AI_MODEL,
+            max_tokens=config.AI_MAX_TOKENS,
+            temperature=config.AI_TEMPERATURE,
+            messages=[{"role": "user", "content": prompt}],
+        )
+    except openai.RateLimitError:
+        # Confirmed live: Gemini's free tier caps gemini-3.6-flash at 20
+        # generation requests per DAY (not per minute) — a real, expected
+        # failure mode at zero budget once ~20 participants have gone
+        # through today, not a bug. Without this, a participant here
+        # would just see "Generating your second opinion..." hang forever
+        # with no explanation — see app.js for how this is surfaced.
+        return jsonify({
+            "error": "daily_limit_reached",
+            "message": (
+                "This study has reached its response limit for today. "
+                "Please try again tomorrow, or contact the researcher."
+            ),
+        }), 429
     verdict_text = response.choices[0].message.content
 
     db.save_ai_verdict(participant_id, verdict_text, now())

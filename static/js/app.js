@@ -46,7 +46,21 @@ async function postJSON(url, body, extraHeaders) {
     body: JSON.stringify(body),
   });
   if (!res.ok) {
-    throw new Error(`Request to ${url} failed: ${res.status}`);
+    // Attach the parsed JSON body (if there is one) to the thrown error so
+    // callers can distinguish known failure modes (e.g. the AI provider's
+    // daily quota) from unexpected ones, instead of every failure looking
+    // the same.
+    let errorBody = null;
+    try {
+      errorBody = await res.json();
+    } catch (e) {
+      // response wasn't JSON (e.g. a generic 500 HTML error page) — fine,
+      // errorBody just stays null and callers fall back to a generic message
+    }
+    const err = new Error(`Request to ${url} failed: ${res.status}`);
+    err.status = res.status;
+    err.body = errorBody;
+    throw err;
   }
   return res.json();
 }
@@ -150,9 +164,24 @@ document.addEventListener("DOMContentLoaded", () => {
       { "X-Participant-Id": participantId }
     );
 
-    const { verdict } = await postJSON("/api/generate-verdict", {
-      participant_id: participantId,
-    });
+    let verdict;
+    try {
+      ({ verdict } = await postJSON("/api/generate-verdict", {
+        participant_id: participantId,
+      }));
+    } catch (err) {
+      // Without this, a failure here (e.g. the AI provider's daily quota
+      // being used up) left participants stuck on "Generating your
+      // second opinion..." forever with no explanation. Show whatever
+      // message the server gave for known failure modes, or a generic
+      // one otherwise — either way, never leave them on a silent spinner.
+      const loadingError = document.getElementById("loading-error");
+      loadingError.textContent =
+        (err.body && err.body.message) ||
+        "Something went wrong generating your response. Please try refreshing the page in a few minutes, or contact the researcher if this keeps happening.";
+      loadingError.hidden = false;
+      return;
+    }
     document.getElementById("verdict-text").textContent = verdict;
     // Also populate the collapsible reference copy on Step 6, so
     // participants can re-read the verdict while answering the
