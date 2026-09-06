@@ -65,6 +65,32 @@ async function postJSON(url, body, extraHeaders) {
   return res.json();
 }
 
+// Wraps a button's click handler so a double-click (or an impatient
+// re-click while a request is in flight) can't fire the handler twice.
+// Without this, e.g. Step 2's continue button could fire two concurrent
+// /api/submit-stance calls, each independently re-drawing
+// assign_condition() and silently overwriting the other's condition, and
+// two /api/generate-verdict calls, burning two of the 20/day Gemini quota
+// for one participant. Any error not already handled inside `handler`
+// surfaces via alert() rather than becoming a silent unhandled rejection.
+function guardedHandler(buttonId, handler) {
+  const button = document.getElementById(buttonId);
+  button.addEventListener("click", async () => {
+    if (button.disabled) return;
+    button.disabled = true;
+    try {
+      await handler();
+    } catch (err) {
+      console.error(err);
+      alert(
+        "Something went wrong. Please try again, or contact the researcher if this keeps happening."
+      );
+    } finally {
+      button.disabled = false;
+    }
+  });
+}
+
 const participantId = getParticipantId();
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -79,7 +105,7 @@ document.addEventListener("DOMContentLoaded", () => {
   consentCheckbox.addEventListener("change", () => {
     consentContinue.disabled = !consentCheckbox.checked;
   });
-  consentContinue.addEventListener("click", async () => {
+  guardedHandler("consent-continue", async () => {
     await postJSON("/api/consent", {
       participant_id: participantId,
       recruitment_source: window.STUDY_META.recruitmentSource,
@@ -88,7 +114,7 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   // --- Step 1: covariates ---
-  document.getElementById("step1-continue").addEventListener("click", async () => {
+  guardedHandler("step1-continue", async () => {
     const errorEl = document.getElementById("step1-error");
     errorEl.textContent = "";
 
@@ -146,13 +172,59 @@ document.addEventListener("DOMContentLoaded", () => {
     preWarning.hidden = wordCount(preRationale.value) >= 20;
   });
 
-  document.getElementById("step2-continue").addEventListener("click", async () => {
+  // Separated from the continue handler so the retry button below can
+  // re-run just this call. Retrying must NOT re-run /api/submit-stance —
+  // the condition was already drawn and stored server-side the first
+  // time, and re-randomizing it on every failed attempt would undermine
+  // the whole point of drawing it once, before anything participant-
+  // authored is even read (see randomization.py).
+  async function requestVerdict() {
+    const loadingError = document.getElementById("loading-error");
+    const retryButton = document.getElementById("loading-retry");
+    loadingError.hidden = true;
+    retryButton.hidden = true;
+
+    let verdict;
+    try {
+      ({ verdict } = await postJSON("/api/generate-verdict", {
+        participant_id: participantId,
+      }));
+    } catch (err) {
+      // Without this, a failure here (e.g. the AI provider's daily quota
+      // being used up) left participants stuck on "Generating your
+      // second opinion..." forever with no explanation and no way
+      // forward short of reloading the page (which restarts the whole
+      // survey from consent). Show whatever message the server gave for
+      // known failure modes, or a generic one otherwise, and offer a
+      // retry that doesn't touch the already-assigned condition.
+      loadingError.textContent =
+        (err.body && err.body.message) ||
+        "Something went wrong generating your response. Please try again in a moment, or contact the researcher if this keeps happening.";
+      loadingError.hidden = false;
+      retryButton.hidden = false;
+      return;
+    }
+    document.getElementById("verdict-text").textContent = verdict;
+    // Also populate the collapsible reference copy on Step 6, so
+    // participants can re-read the verdict while answering the
+    // post-verdict questions instead of relying on memory.
+    document.getElementById("verdict-reference-text").textContent = verdict;
+    showStep("step-5");
+  }
+
+  guardedHandler("loading-retry", requestVerdict);
+
+  guardedHandler("step2-continue", async () => {
+    const errorEl = document.getElementById("step2-error");
+    errorEl.textContent = "";
+
     const stance = getRadioValue("pre_stance");
     const confidence = getRadioValue("pre_confidence");
     const rationale = preRationale.value.trim();
-    if (!stance || !confidence || !rationale) return;
-
-    showStep("step-loading");
+    if (!stance || !confidence || !rationale) {
+      errorEl.textContent = "Please answer every question before continuing.";
+      return;
+    }
 
     // Randomization happens server-side in /api/submit-stance — see
     // randomization.py and app.py for the guarantee. This call sends
@@ -164,30 +236,8 @@ document.addEventListener("DOMContentLoaded", () => {
       { "X-Participant-Id": participantId }
     );
 
-    let verdict;
-    try {
-      ({ verdict } = await postJSON("/api/generate-verdict", {
-        participant_id: participantId,
-      }));
-    } catch (err) {
-      // Without this, a failure here (e.g. the AI provider's daily quota
-      // being used up) left participants stuck on "Generating your
-      // second opinion..." forever with no explanation. Show whatever
-      // message the server gave for known failure modes, or a generic
-      // one otherwise — either way, never leave them on a silent spinner.
-      const loadingError = document.getElementById("loading-error");
-      loadingError.textContent =
-        (err.body && err.body.message) ||
-        "Something went wrong generating your response. Please try refreshing the page in a few minutes, or contact the researcher if this keeps happening.";
-      loadingError.hidden = false;
-      return;
-    }
-    document.getElementById("verdict-text").textContent = verdict;
-    // Also populate the collapsible reference copy on Step 6, so
-    // participants can re-read the verdict while answering the
-    // post-verdict questions instead of relying on memory.
-    document.getElementById("verdict-reference-text").textContent = verdict;
-    showStep("step-5");
+    showStep("step-loading");
+    await requestVerdict();
   });
 
   // --- Step 5: verdict display ---
@@ -202,7 +252,7 @@ document.addEventListener("DOMContentLoaded", () => {
     postWarning.hidden = wordCount(postRationale.value) >= 20;
   });
 
-  document.getElementById("step6-continue").addEventListener("click", async () => {
+  guardedHandler("step6-continue", async () => {
     const errorEl = document.getElementById("step6-error");
     errorEl.textContent = "";
 
@@ -257,7 +307,7 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   // --- Step 7: debrief ---
-  document.getElementById("step7-finish").addEventListener("click", async () => {
+  guardedHandler("step7-finish", async () => {
     const feedback = document.getElementById("debrief_feedback").value.trim();
     await postJSON("/api/debrief-feedback", {
       participant_id: participantId,

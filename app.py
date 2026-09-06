@@ -131,6 +131,14 @@ def api_covariates():
 @app.route("/api/submit-stance", methods=["POST"])
 def api_submit_stance():
     participant_id = request.headers.get("X-Participant-Id")
+    if not participant_id:
+        # Without this, a missing/stripped header would silently no-op
+        # both the condition write and the stance write below (UPDATE
+        # ... WHERE id = NULL matches zero rows but raises nothing), and
+        # the participant would only find out one step later, when
+        # generate-verdict's "no condition assigned" check finally
+        # catches it.
+        return jsonify({"error": "missing participant id"}), 400
 
     # --- RANDOMIZATION: happens first, touches nothing else yet ---
     condition = assign_condition()
