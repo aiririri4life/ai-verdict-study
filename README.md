@@ -32,7 +32,7 @@ covariates, and all five DV scales. A few things still need a human, not code:
   classmates recruited under normal school-context norms, but if your
   recruitment pool goes beyond that (e.g. `?src=prolific` or any public
   link), that self-attestation is probably not enough on its own — this is
-  an IRB-style judgment call for an advisor, not something to default your
+  a judgment call for your advisor's review, not something to default your
   way through in code.
 
 ## Analysis reference: DV → hypothesis mapping

@@ -30,7 +30,7 @@ Risks: This study involves a hypothetical scenario, not real money or real decis
 
 Your rights: Participation is completely voluntary. You may stop at any point without penalty, and you may skip any question you're not comfortable answering. There is no compensation for participating.
 
-Questions: If you have questions about this study, you can contact Ria Singh at {CONTACT_EMAIL}. This study is being advised by Ben Charoenwong (INSEAD)."""
+Questions: If you have questions about this study, you can contact Ria Singh at {CONTACT_EMAIL}. This study has been reviewed by my faculty advisor, Ben Charoenwong (INSEAD), rather than a formal Institutional Review Board (IRB), as this is an independent student research project."""
 
 # Checkbox label shown next to the consent checkbox on Step 0 — combines
 # the age attestation with agreement to participate, matching CONSENT_TEXT.
