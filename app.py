@@ -225,6 +225,23 @@ def api_generate_verdict():
                 "Please try again tomorrow, or contact the researcher."
             ),
         }), 429
+    except openai.InternalServerError:
+        # Confirmed live in Render's logs (2026-09-07): Gemini returns a
+        # distinct 503 "This model is currently experiencing high demand"
+        # under load -- a different exception class from RateLimitError,
+        # so it wasn't caught here before and fell through as a raw HTML
+        # 500 (unparseable by app.js's postJSON, which only extracts a
+        # JSON error body). The retry button already handles this fine
+        # once it gets a real message -- this is transient per Google's
+        # own wording, unlike the daily quota -- so give it one instead of
+        # an opaque server error page.
+        return jsonify({
+            "error": "model_overloaded",
+            "message": (
+                "The AI service is temporarily overloaded. Please try "
+                "again in a moment."
+            ),
+        }), 503
     verdict_text = response.choices[0].message.content
 
     db.save_ai_verdict(participant_id, verdict_text, now())
