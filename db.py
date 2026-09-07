@@ -331,3 +331,23 @@ def delete_participants_except(recruitment_source_to_keep):
             (recruitment_source_to_keep,),
         )
         return cur.rowcount
+
+
+def delete_incomplete_participants(recruitment_source):
+    """One-off cleanup helper, paired with delete_participants_except above
+    and used the same way via /admin/cleanup: within the pilot rows being
+    kept, deletes any row that never got a verdict (ai_verdict_text IS
+    NULL) — a client-side timeout, a 429/503 mid-run, or an abandoned
+    session that never reached /api/generate-verdict. Confirmed live
+    (2026-09-07) that a slow Gemini response can still complete
+    server-side after the pilot script's client gave up and moved on, so
+    NULL here reliably means "no verdict was ever generated for this
+    participant", not "one might still be in flight". A row with a
+    verdict but no post-verdict/debrief data is still kept — it's still a
+    real audit sample for the AI prompt, just an incomplete survey."""
+    with get_db() as conn:
+        cur = conn.execute(
+            "DELETE FROM participants WHERE recruitment_source = ? AND ai_verdict_text IS NULL",
+            (recruitment_source,),
+        )
+        return cur.rowcount

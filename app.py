@@ -301,19 +301,29 @@ def admin_export():
 
 
 # --- TEMPORARY: one-off pilot-data cleanup ---------------------------------
-# Deletes every participant row except the pilot-audit-batch-3 ones, to
-# clear out earlier test/pilot rows before real data collection starts.
-# Remove this route (and delete_participants_except() in db.py) once
-# you've run it once — this is scoped to today's specific cleanup, not
-# meant to be a standing bulk-delete capability left in a live app.
+# Two-step cleanup down to just the legit pilot-audit-batch-3 data:
+# 1) deletes every row from any other/no recruitment_source (earlier
+#    test/pilot batches, individual verification rows), then
+# 2) within what's left, deletes rows that never got a verdict (a
+#    client-side timeout, a 429/503 mid-run, an abandoned session) --
+#    the "null responses", not real audit samples.
+# Remove this route (and delete_participants_except() /
+# delete_incomplete_participants() in db.py) once you've run it once —
+# scoped to this specific cleanup, not a standing bulk-delete capability
+# meant to be left in a live app.
 @app.route("/admin/cleanup", methods=["POST"])
 def admin_cleanup():
     supplied = request.args.get("password", "")
     if not ADMIN_EXPORT_PASSWORD or not secrets.compare_digest(supplied, ADMIN_EXPORT_PASSWORD):
         return "Unauthorized", 401
 
-    deleted_count = db.delete_participants_except("pilot-audit-batch-3")
-    return jsonify({"deleted": deleted_count})
+    deleted_other_batches = db.delete_participants_except("pilot-audit-batch-3")
+    deleted_incomplete = db.delete_incomplete_participants("pilot-audit-batch-3")
+    return jsonify({
+        "deleted_other_batches": deleted_other_batches,
+        "deleted_incomplete_pilot_rows": deleted_incomplete,
+        "total_deleted": deleted_other_batches + deleted_incomplete,
+    })
 
 
 if __name__ == "__main__":
