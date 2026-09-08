@@ -211,13 +211,19 @@ def api_generate_verdict():
             temperature=config.AI_TEMPERATURE,
             messages=[{"role": "user", "content": prompt}],
         )
-    except openai.RateLimitError:
-        # Confirmed live: Gemini's free tier caps gemini-3.6-flash at 20
-        # generation requests per DAY (not per minute) — a real, expected
-        # failure mode at zero budget once ~20 participants have gone
-        # through today, not a bug. Without this, a participant here
-        # would just see "Generating your second opinion..." hang forever
-        # with no explanation — see app.js for how this is surfaced.
+    except openai.RateLimitError as e:
+        # Originally confirmed live as the 20/day cap (not per-minute) --
+        # but RateLimitError (429) is the same exception class Gemini
+        # would also raise for a per-minute throttle, and this handler
+        # was unconditionally labeling every occurrence "daily_limit_reached"
+        # without ever looking at the actual message, so a per-minute hit
+        # would be indistinguishable from real daily exhaustion in the
+        # logs. Logging the raw error here (client-facing message/status
+        # unchanged) so a future occurrence can actually be told apart --
+        # prompted by two observed cases (2026-09-07, 2026-09-08) where a
+        # success was followed by a 429 only seconds to tens of seconds
+        # later, which is hard to square with a true daily cap.
+        app.logger.warning(f"RateLimitError on /api/generate-verdict: {e}")
         return jsonify({
             "error": "daily_limit_reached",
             "message": (
