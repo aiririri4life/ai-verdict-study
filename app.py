@@ -56,6 +56,21 @@ ai_client = (
     else None
 )
 
+# gemini-3.6-flash is a reasoning model that spends part of AI_MAX_TOKENS on
+# hidden "thinking" before any visible output -- the likely cause of the
+# multi-minute latencies behind several ambiguous client-side timeouts
+# during pilot testing (2026-09-07/08). Attempting to cap that budget via
+# Google's documented thinking_config passthrough (unverified against this
+# specific model as of this deploy -- WebSearch/WebFetch were both down
+# when this was written, so this could not be checked live before
+# shipping). NOT worth guessing wrong and eating an extra RateLimitError
+# on every call against a 20/day budget: if the API rejects this shape,
+# api_generate_verdict() falls back once and then stops trying it for the
+# rest of this worker's process lifetime, so a wrong guess costs at most
+# one wasted call, not one per call. Confirm this actually helped (or
+# revert it) after the next real pilot run.
+_thinking_config_supported = True
+
 
 def now():
     return datetime.now(timezone.utc).isoformat()
@@ -204,13 +219,43 @@ def api_generate_verdict():
     # empty with nothing else in the array. Sending everything as a single
     # "user" message works universally across providers, which matters
     # now that we're on our second provider swap.
+    global _thinking_config_supported
+    create_kwargs = dict(
+        model=AI_MODEL,
+        max_tokens=config.AI_MAX_TOKENS,
+        temperature=config.AI_TEMPERATURE,
+        messages=[{"role": "user", "content": prompt}],
+    )
     try:
-        response = ai_client.chat.completions.create(
-            model=AI_MODEL,
-            max_tokens=config.AI_MAX_TOKENS,
-            temperature=config.AI_TEMPERATURE,
-            messages=[{"role": "user", "content": prompt}],
-        )
+        if _thinking_config_supported:
+            try:
+                response = ai_client.chat.completions.create(
+                    **create_kwargs,
+                    extra_body={
+                        "extra_body": {
+                            "google": {
+                                "thinking_config": {
+                                    "thinking_budget": 1024,
+                                    "include_thoughts": False,
+                                }
+                            }
+                        }
+                    },
+                )
+            except openai.BadRequestError:
+                # Unverified parameter shape was rejected -- remember that
+                # for the rest of this worker's lifetime so we don't pay
+                # for this mistake on every subsequent call, then fall
+                # back to the known-working request for this one.
+                _thinking_config_supported = False
+                app.logger.warning(
+                    "thinking_config extra_body rejected by the API -- "
+                    "falling back to the default request shape for the "
+                    "rest of this worker's lifetime."
+                )
+                response = ai_client.chat.completions.create(**create_kwargs)
+        else:
+            response = ai_client.chat.completions.create(**create_kwargs)
     except openai.RateLimitError as e:
         # Originally confirmed live as the 20/day cap (not per-minute) --
         # but RateLimitError (429) is the same exception class Gemini
